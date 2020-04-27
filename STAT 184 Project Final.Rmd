@@ -1,0 +1,235 @@
+---
+name: Mahi Srivastava, Pranav Jain
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(DataComputing)
+library(dplyr)
+library(ggmap)
+library(ggrepel)
+library(tidyverse)
+
+#Importing two different data sources.
+airport_data <- read.csv("196400287_T_MASTER_CORD.csv")
+routes_data <- read.csv("routes.csv")
+```
+
+### Inspecting Imported Data Sources
+```{r}
+str(airport_data)
+```
+
+```{r}
+head(airport_data)
+```
+
+```{r}
+str(routes_data)
+```
+
+```{r}
+head(routes_data)
+```
+
+### General Data Wrangling 
+```{r}
+airport_data <-
+  airport_data%>%
+  rename(Airport_code = AIRPORT)
+```
+
+```{r}
+airports <-
+  airport_data%>%
+  distinct(Airport_code, .keep_all = TRUE)
+```
+
+### Creating leaflet to show multiple airports on worldmap
+```{r}
+leaflet(airports)%>%
+  addTiles()%>%
+  addCircleMarkers(radius = 2,label = ~DISPLAY_AIRPORT_NAME)
+```
+
+
+### Join Operation for joining the two Data Sets by the column source.airport
+```{r}
+JointTable <-
+  routes_data %>%
+  left_join(airports %>% select(Airport_code,LATITUDE,LONGITUDE), by = c("source.airport" = "Airport_code"))
+```
+
+```{r}
+JointTable <-
+  JointTable%>%
+  rename(source_latitude = LATITUDE,
+         source_longitude = LONGITUDE)
+```
+
+### Join Operation for joining the two Data Sets by the column destination.apirport
+```{r}
+JointTable <-
+  JointTable %>%
+  left_join(airports %>% select(Airport_code,LATITUDE,LONGITUDE), by = c("destination.apirport" = "Airport_code"))
+```
+
+```{r}
+JointTable <-
+  JointTable%>%
+  rename(destination_latitude = LATITUDE,
+         destination_longitude = LONGITUDE)
+```
+
+### Inspecting the JointTable
+```{r}
+str(JointTable)
+```
+
+###Removing the unnecessary columns from JointTable
+```{r}
+JointTable <-
+  JointTable %>%
+  select(airline, source.airport, destination.apirport, equipment, source_latitude, source_longitude, destination_latitude, destination_longitude)
+```
+
+
+###Creating a user - defined function
+```{r}
+earth.dist <- function (long1, lat1, long2, lat2)
+{
+rad <- pi/180
+a1 <- lat1 * rad
+a2 <- long1 * rad
+b1 <- lat2 * rad
+b2 <- long2 * rad
+dlon <- b2 - a2
+dlat <- b1 - a1
+a <- (sin(dlat/2))^2 + cos(a1) * cos(b1) * (sin(dlon/2))^2
+c <- 2 * atan2(sqrt(a), sqrt(1 - a))
+R <- 6378.145
+d <- R * c
+return(d)
+}
+```
+
+### Finding the distance between two coordinates
+```{r}
+JointTable<-
+  JointTable%>%
+  mutate(distance = earth.dist(source_longitude,source_latitude,destination_longitude,destination_latitude))
+```
+
+### Grouping the distance in short, edium or long with the use of Control Flow (if-else statement)
+```{r}
+JointTable <-
+  JointTable%>%
+  mutate(Distance_class = ifelse(distance <= 3000, "short", ifelse(distance >3000 & distance <= 9000, "Medium", "Long")))
+```
+
+### Making a table for all the long routes with the use of reduction/transformation function
+```{r}
+LongTable <-
+  JointTable%>%
+  filter(Distance_class == "Long")%>%
+  group_by(equipment)%>%
+  summarise(count = n())%>%
+  arrange(desc(count))%>%
+  head(10)
+```
+
+### Plotting a Graph to show which aircraft model (equipment) is most common for long flights 
+```{r}
+ggplot(data=LongTable,aes(x=equipment,y=count ))+geom_bar(stat='identity',position='stack', width=.9)
+```
+
+The above graph tells us that 777 is the most used aircraft model(equipment) for long flights. 
+
+### Making a new table which has two variables that show the aircraft model(equipment) and the number of routes it is used for (count)
+```{r}
+routes_777 <- 
+  JointTable%>%
+  filter(Distance_class == "Long", equipment == "777")
+```
+
+### Plotting a map to show routes of long flights with the help of multiple different geoms and mutiple aesthetics
+```{r}
+worldmap <- borders("world", colour = "#FFFFFF", fill = "#efede1") 
+  ggplot() + worldmap + 
+    geom_point(data = routes_777, aes(x = source_longitude, y = source_latitude), col = "#970027") + 
+    geom_curve(data = routes_777, aes(x = source_longitude, y = source_latitude, xend = destination_longitude, yend = destination_latitude), 
+               col = "#b29e7d", size = .4) + 
+    theme_void()
+```
+
+
+### Making a table for all the medium routes with the use of reduction/transformation function
+```{r}
+MediumTable <-
+  JointTable%>%
+  filter(Distance_class == "Medium")%>%
+  group_by(equipment)%>%
+  summarise(count = n())%>%
+  arrange(desc(count))%>%
+  head(10)
+```
+
+### Plotting a Graph to show which aircraft model (equipment) is most common for medium flights
+```{r}
+ggplot(data=MediumTable,aes(x=equipment,y=count ))+geom_bar(stat='identity',position='stack', width=.9)
+```
+The above graph tells us that 320 is the most used aircraft model(equipment) for medium flights.
+
+### Making a new table which has two variables that show the aircraft model(equipment) and the number of routes it is used for(count)
+```{r}
+routes_320 <- 
+  JointTable%>%
+  filter(Distance_class == "Medium", equipment == "320")
+```
+
+### Plotting a map to show routes of medium flights with the help of multiple different geoms and mutiple aesthetics
+```{r}
+worldmap <- borders("world", colour = "#FFFFFF", fill = "#efede1") 
+  ggplot() + worldmap + 
+    geom_point(data = routes_320, aes(x = source_longitude, y = source_latitude), col = "#970027") + 
+    geom_curve(data = routes_320, aes(x = source_longitude, y = source_latitude, xend = destination_longitude, yend = destination_latitude), 
+               col = "#b29e7d", size = .4) + 
+    theme_void()
+```
+
+### Making a table for all the short routes with the use of reduction/transformation function
+```{r}
+ShortTable <-
+  JointTable%>%
+  filter(Distance_class == "short")%>%
+  group_by(equipment)%>%
+  summarise(count = n())%>%
+  arrange(desc(count))%>%
+  head(10)
+```
+
+### Plotting a Graph to show which aircraft model (equipment) is most common for short flights
+```{r}
+ggplot(data=ShortTable,aes(x=equipment,y=count ))+geom_bar(stat='identity',position='stack', width=.9)
+```
+
+The above graph tells us that 320 is the most used aircraft model(equipment) for short flights.
+
+### Making a new table which has two variables that show the aircraft model(equipment) and the number of routes it is used for(count)
+```{r}
+routes_320_short <- 
+  JointTable%>%
+  filter(Distance_class == "short", equipment == "320")
+```
+
+### Plotting a map to show routes of short flights with the help of multiple different geoms and mutiple aesthetics
+```{r}
+worldmap <- borders("world", colour = "#FFFFFF", fill = "#efede1") 
+  ggplot() + worldmap + 
+    geom_point(data = routes_320_short, aes(x = source_longitude, y = source_latitude), col = "#970027") + 
+    geom_curve(data = routes_320_short, aes(x = source_longitude, y = source_latitude, xend = destination_longitude, yend = destination_latitude), 
+               col = "#b29e7d", size = .4) + 
+    theme_void()
+```
+

@@ -1,0 +1,53 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(DataComputing)
+library(dplyr)
+routes_data = read.csv("routes.csv")
+airport_data = read.csv("196400287_T_MASTER_CORD.csv")
+routes_data<-
+  routes_data%>%
+  rename(destination.airport = destination.apirport)
+```
+
+
+Top 10 airline by routes 
+```{r}
+routes_data%>%
+  group_by(airline)%>%
+  summarise(total = n())%>%
+  arrange(desc(total))%>%
+  head(10)%>%
+  ggplot(aes(x = airline,y = total))+
+  geom_bar(stat = "identity")
+  
+
+```
+
+Most common destination
+
+```{r}
+routes_data%>%
+  group_by(destination.airport)%>%
+  summarise(total = n())%>%
+  arrange(desc(total))%>%
+  head(10)%>%
+  ggplot(aes(x = destination.airport,y = total))+
+  geom_bar(stat = "identity")
+    
+```
+
+Popular aircrafts 
+
+```{r}
+routes_data%>%
+  group_by(equipment)%>%
+  summarise(total = n())%>%
+  arrange(desc(total))%>%
+  head(10)
+  
+```
+As we can see that the top 4 aircrafts are either Boeing(738,737) or Airbus(320,319). They are the biggest manufactures in the airline industry. In my opinion, in each of the segments, it will be either one of their aircrafts that would be preffered by the airline. It would only be in the shorter route where any smaller company would even come close. 
